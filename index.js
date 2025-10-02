@@ -12,6 +12,18 @@ app.use(express.json());
 app.use(cors());
 app.use(bodyParser.urlencoded({ extended: false }));
 
+app.use((req, res, next) => {
+  console.log("CONTENT-TYPE:", req.headers['content-type']);
+  console.log("RAW BODY:", req.body);
+  next();
+});
+
+const userRoute = require("./routes/userRoute.js");
+
+app.use("/user", userRoute);
+
+
+
 const PORT = process.env.PORT || 801;
 server.listen(PORT, () => {
   console.log(`The Service running well... at http://localhost:${PORT}`);
