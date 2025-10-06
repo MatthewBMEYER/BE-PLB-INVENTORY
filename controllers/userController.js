@@ -5,6 +5,7 @@ const crypto = require('crypto');
 const { v4: uuidv4 } = require('uuid');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const { text } = require('body-parser');
 
 
 
@@ -14,21 +15,54 @@ module.exports = {
         try {
             const { nama_user, email, pwd, role_id } = req.body;
 
+            //validasi password minimal 6karakter
+            if (!pwd || pwd.length < 6) {
+                return res.status(400).json({
+                    status: "error",
+                    kode: 400,
+                    message: "password harus minimal 6 karakter"
 
-            // generate m_user_id unik
-            const m_user_id = uuidv4();
+                })
+            }
+            //cek email, sudah ada apa belum
+            const sqlcheckemail = `SELECT * FROM m_user WHERE email = ?`;
+            DB.query(sqlcheckemail, [email], (err, results) => {
+                if (err) {
+                    return res.status(500).json({
+                        status: "error",
+                        kode: 500,
+                        message: err.message
+                    });
+                }
 
-            // SQL insert
-            const sql = `
+                if (results.length > 0) {
+                    return res.status(409).json({
+                        status: "error",
+                        kode: 409,
+                        message: "Email sudah terdaftar"
+                    });
+                }
+
+                // kalau belum ada, baru insert
+                const m_user_id = uuidv4();
+                const sql = `
                 INSERT INTO m_user 
                 (m_user_id, nama_user, email, pwd, isactive, role_id, createdate, updatedate)
                 VALUES (?,?,?,SHA2(?,256),?,?,NOW(),NOW())`;
 
-            DB.query(sql, [m_user_id, nama_user, email, pwd, 1, role_id || 'custom'], (err) => {
-                if (err) return res.status(500).json({ message: err.message });
+                DB.query(sql, [m_user_id, nama_user, email, pwd, 1, role_id || 'custom'], (err) => {
+                    if (err) {
+                        return res.status(500).json({ message: err.message });
+                    }
 
-                return res.status(201).json({ message: 'Register sukses' });
+                    return res.status(201).json({
+                        status: "success",
+                        kode: 201,
+                        message: "Register sukses"
+                    });
+                });
             });
+
         } catch (err) {
             return res.status(500).json({ message: err.message });
         }
@@ -87,19 +121,16 @@ module.exports = {
 
                 const user = results[0];
 
-                // generate token reset
-                const resetToken = crypto.randomBytes(32).toString('hex');
-                const resetExpires = new Date(Date.now() + 3600000); // 1 jam
+                const tempPassword = Math.random().toString(36).slice(-8);
 
-                // simpan ke DB
-                const updateSql = `UPDATE m_user SET reset_token = ?, reset_expires = ? WHERE m_user_id = ?`;
-                DB.query(updateSql, [resetToken, resetExpires, user.m_user_id], (err) => {
-                    if (err) {
-                        console.error(" Error update token:", err); // ADD LOG
-                        return res.status(500).json({ message: err.message });
-                    }
+                // update password sementara ke DB
+                const updateSql = `UPDATE m_user 
+                               SET pwd = SHA2(?,256), reset_token = NULL, reset_expires = NULL 
+                               WHERE m_user_id = ?`;
+                DB.query(updateSql, [tempPassword, user.m_user_id], (err) => {
+                    if (err) return res.status(500).json({ message: err.message });
 
-                    console.log(" Token tersimpan di DB:", resetToken); // ADD LOG
+
 
                     // kirim email pakai nodemailer
                     const transporter = nodemailer.createTransport({
@@ -113,27 +144,24 @@ module.exports = {
                         }
                     });
 
-                     const resetUrl = `http://localhost:801/user/reset-password/${resetToken}`; // FIX
-
-                    // const resetUrl = `${process.env.APP_URL}/user/reset-password/${resetToken}`;
-
-
                     const mailOptions = {
-                        from: process.env.EMAIL_USER,
-                        to: user.email,
-                        subject: 'Reset Password',
-                        html: `<p>Klik link berikut untuk reset password:</p>
-                           <a href="${resetUrl}">${resetUrl}</a>`
+                    from: process.env.EMAIL_USER,
+                    to: user.email,
+                    subject: "Password Sementara",
+                    html: `
+                        <p>Password sementara Anda adalah:</p>
+                        <h3>${tempPassword}</h3>
+                        <p>Silakan login dengan password ini, lalu segera ubah password di menu Ubah Password.</p>
+                    `
                     };
 
                     transporter.sendMail(mailOptions, (err, info) => {
-                        if (err) {
-                            console.error("Gagal kirim email:", err); // ADD LOG
-                            return res.status(500).json({ message: 'gagal kirim email', error: err });
-                        }
-                        console.log("Email reset terkirim:", info.response); // ADD LOG
-                        return res.json({ message: 'email reset password terkirim' });
-                    });
+                    if (err) return res.status(500).json({ message: "Gagal kirim email", error: err });
+
+                    console.log("Email terkirim:", info.response);
+                    return res.json({ message: "Password sementara berhasil dikirim ke email." });
+                });
+                    
                 });
             });
 
@@ -141,30 +169,52 @@ module.exports = {
             console.error(" Error catch:", err); // ADD LOG
             return res.status(500).json({ message: err.message });
         }
-    },
-
-    resetPassword: async function (req, res) {
-        const { token } = req.params;
-        const { newPassword } = req.body;
-
-        try {
-            const sql = `select * from m_user where reset_token = ? and reset_expires > now()`;
-            DB.query(sql, [token], (err, results) => {
-                if (err) return res.status(500).json({ message: err.message });
-                if (results.length === 0) return res.status(400).json({ message: 'token invalid atau sudah expired' });
-
-                const user = results[0];
-
-                //update password
-                const updateSql = `update m_user set password= SHA2(?,256),reset_token = null, reset_expires = null where m_user_id = ?`;
-                DB.query(updateSql, [newPassword, user.m_user_id], (err) => {
-                    if (err) return res.status(500).json({ message: err.message });
-                    return res.json({ message: 'password berhasil di reset' });
-                });
-            });
-        } catch (err) {
-            return res.status(500).json({ message: err.message });
-        }
     }
+
+    // resetPassword: async function (req, res) {
+    //     const { token } = req.params;
+
+    //     try {
+    //         const sql = `select * from m_user where reset_token = ? and reset_expires > now()`;
+    //         DB.query(sql, [token], (err, results) => {
+    //             if (err) return res.status(500).json({ message: err.message });
+    //             if (results.length === 0) return res.status(400).json({ message: 'token invalid atau sudah expired' });
+
+    //             const user = results[0];
+
+    //             //generete password baru
+    //             const newPassword = Math.random().toString(36).slice(-8);
+
+    //             //update password
+    //             const updateSql = `update m_user set password= SHA2(?,256),reset_token = null, reset_expires = null where m_user_id = ?`;
+    //             DB.query(updateSql, [newPassword, user.m_user_id], (err) => {
+    //                 if (err) return res.status(500).json({ message: err.message });
+
+    //                 //kirim email  password baru
+    //                 const transporter = nodemailer.createTransport({
+    //                     host: "smtp.gmail.com",
+    //                     port: 465,
+    //                     secure: true,
+    //                     auth: {
+    //                         user: process.env.EMAIL_USER,
+    //                         pass: process.env.EMAIL_PASS
+    //                     }
+    //                 });
+
+    //                 const mailOptions = {
+    //                     from: process.env.EMAIL_USER,
+    //                     to: user.email,
+    //                     subject: "ini password baru anda",
+    //                     text: `password baru anda : ${newPassword}`
+    //                 }
+
+    //                 transporter.sendMail(mailOptions, () => { });
+    //                 return res.send("password berhasil di reset, silahkan cek email anda untuk password baru")
+    //             });
+    //         });
+    //     } catch (err) {
+    //         return res.status(500).json({ message: err.message });
+    //     }
+    // }
 
 };

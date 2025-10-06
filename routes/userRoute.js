@@ -10,7 +10,7 @@ router.use(express.urlencoded({ extended: false }));
 router.post(`/login`, userController.login);
 router.post(`/register`, userController.register);
 router.post(`/forget-password`, userController.forgetPassword);
-router.post(`/reset-password/:token`, userController.resetPassword);
+
 
 // semua user login bisa akses
 router.get('/profile',auth,(req,res)=>{
