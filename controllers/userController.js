@@ -1,220 +1,232 @@
 const express = require('express');
 const { DB } = require('../config/conf');
 const nodemailer = require('nodemailer');
-const crypto = require('crypto');
-const { v4: uuidv4 } = require('uuid');
-const bcrypt = require('bcrypt');
-const jwt = require('jsonwebtoken');
-const { text } = require('body-parser');
-
-
+const crypto = require('crypto'); 
 
 
 module.exports = {
-    register: async function (req, res) {
-        try {
-            const { nama_user, email, pwd, role_id } = req.body;
-
-            //validasi password minimal 6karakter
-            if (!pwd || pwd.length < 6) {
-                return res.status(400).json({
-                    status: "error",
-                    kode: 400,
-                    message: "password harus minimal 6 karakter"
-
-                })
-            }
-            //cek email, sudah ada apa belum
-            const sqlcheckemail = `SELECT * FROM m_user WHERE email = ?`;
-            DB.query(sqlcheckemail, [email], (err, results) => {
-                if (err) {
-                    return res.status(500).json({
-                        status: "error",
-                        kode: 500,
-                        message: err.message
-                    });
-                }
-
-                if (results.length > 0) {
-                    return res.status(409).json({
-                        status: "error",
-                        kode: 409,
-                        message: "Email sudah terdaftar"
-                    });
-                }
-
-                // kalau belum ada, baru insert
-                const m_user_id = uuidv4();
-                const sql = `
-                INSERT INTO m_user 
-                (m_user_id, nama_user, email, pwd, isactive, role_id, createdate, updatedate)
-                VALUES (?,?,?,SHA2(?,256),?,?,NOW(),NOW())`;
-
-                DB.query(sql, [m_user_id, nama_user, email, pwd, 1, role_id || 'custom'], (err) => {
-                    if (err) {
-                        return res.status(500).json({ message: err.message });
-                    }
-
-                    return res.status(201).json({
-                        status: "success",
-                        kode: 201,
-                        message: "Register sukses"
-                    });
-                });
-            });
-
-        } catch (err) {
-            return res.status(500).json({ message: err.message });
-        }
-    },
-
     login: async function (req, res) {
         try {
+            const request = DB.promise();
             const { email, pwd } = req.body;
-            console.log('cek email', email);
-            console.log('cek pass', pwd);
+            console.log('Login request : ', req.body); 
 
-            // Cari user berdasarkan email + password hash
-            const sql = `SELECT * FROM m_user 
-                 WHERE email = ? AND pwd = SHA2(?,256) AND isactive = 1`;
+            if (!email || !pwd) {
+                return res.status(400).json({ kode: 400, message: 'Email dan password wajib diisi' });
+            }
 
-            DB.query(sql, [email, pwd], (err, results) => {
-                if (err) return res.status(500).json({ message: err.message });
-                if (results.length === 0)
-                    return res.status(401).json({ message: 'Email atau password salah' });
+            const cekUser = `SELECT * FROM m_user a WHERE email = ? AND pwd = SHA2(?, 256) LIMIT 1`;
+            const [users] = await request.query(cekUser, [email, pwd]);
+            const user = users[0];
 
-                const user = results[0];
-
-                // Buat JWT token
-                const token = jwt.sign(
-                    { m_user_id: user.m_user_id, role_id: user.role_id },
-                    process.env.JWT_SECRET,
-                    { expiresIn: '1h' }
-                );
-
-                return res.status(200).json({
-                    kode: 200, //supaya match dengan fe yg ngecek res.data.kode
-                    message: 'Login sukses',
-                    data: {
-                        m_user_id: user.m_user_id,
-                        nama_user: user.nama_user,
-                        email: user.email,
-                        role_id: user.role_id,
-                        token
-                    }
+            if (users.length === 0) {
+                return res.status(400).json({ kode: 400, message: 'Login gagal. Email atau password salah' });
+            }
+            if (user.isactive == 0 || user.role_id === null) {
+                return res.status(400).json({
+                  kode: 400,
+                  message: 'User Belum Aktif, Silahkan hubungi administrator',
                 });
+            }            
+
+            const roleQuery = `
+                SELECT distinct b.nama_role, c.role_menu_id, c.header_menu, c.child_menu 
+                FROM m_user a
+                INNER JOIN m_role b ON a.role_id = b.role_id 
+                INNER JOIN role_menu c ON c.role_id = b.role_id 
+                inner join m_menu d on d.header_menu = c.header_menu 
+                WHERE a.m_user_id = ? AND c.isactive = 1
+                order by d.sort asc
+            `;
+
+            const [roleMenus] = await request.query(roleQuery, [user.m_user_id]);
+
+            if (roleMenus.length === 0) {
+                return res.status(401).json({ kode: 401, message: 'Role belum diatur!' });
+            }
+
+            for (let i = 0; i < roleMenus.length; i++) {
+                const { child_menu, header_menu } = roleMenus[i];
+                if (child_menu) {
+                    const childQuery = `
+                        SELECT * FROM m_menu 
+                        WHERE child IN (${child_menu}) AND header_menu = ? AND isactive = 1 
+                        ORDER BY sort ASC
+                    `;
+                    const [children] = await request.query(childQuery, [header_menu]);
+                    roleMenus[i] = { ...roleMenus[i], child: children };
+                }
+            }
+
+            return res.status(200).json({
+                kode: 200,
+                message: 'OK',
+                data: { user, roleMenus },
             });
-        } catch (err) {
-            return res.status(500).json({ message: err.message });
+
+        } catch (error) {
+            return res.status(500).json({ kode: 500, message: 'Terjadi kesalahan server', error });
         }
     },
 
-    forgetPassword: async function (req, res) {
-        const { email } = req.body;
+    list: async function (req, res) {
+        try {
+            const request = DB.promise();
+            const [data] = await request.query(`SELECT * FROM m_user`);
+            res.status(200).json({ kode: 200,message: "OK", data });
+        } catch (error) {
+            console.log(error);
+            res.status(500).json(error);
+        }
+    },
+
+    registerUser: async function (req, res) {
+        try {
+            const request = DB.promise();
+            const { nama_user, email, password , role_id } = req.body;
+
+            console.log('register request : ', req.body);
+
+            if (!nama_user || !email) {
+                return res.status(400).json({ kode: 400, message: 'Nama user, email, dan role wajib diisi' });
+            }
+
+            const [existingUsers] = await request.query(
+                `SELECT * FROM m_user WHERE email = ? AND isactive = 1`,
+                [email]
+            );
+
+            if (existingUsers.length > 0) {
+                return res.status(409).json({ kode: 409, message: 'Email sudah terdaftar' });
+            }
+
+            await request.query(
+                `INSERT INTO m_user 
+                (m_user_id, nama_user, email, pwd, isactive, role_id, createdate)
+                VALUES (UUID(), ?, ?, SHA2(?, 256), 1, ?, NOW())`,
+                [nama_user, email, password, role_id]
+            );
+
+            return res.status(200).json({ kode: 200, message: 'User berhasil didaftarkan' });
+
+        } catch (error) {
+            console.error('Register error:', error);
+            return res.status(500).json({ kode: 500, message: 'Terjadi kesalahan server', error: error.message });
+        }
+    },
+
+    forgotPassword: async function (req, res) {
+        console.log("SMTP_USER:", process.env.SMTP_USER);
+        console.log("SMTP_PASS:", process.env.SMTP_PASS ? 'SET' : 'NOT SET');
 
         try {
-            // cek email dulu, ada atau ngga ?
-            const sql = `SELECT * FROM m_user WHERE email = ?`;
-            DB.query(sql, [email], (err, results) => {
-                if (err) return res.status(500).json({ message: err.message });
-                if (results.length === 0) return res.status(404).json({ message: `email tidak ditemukan` });
+            const { email } = req.body;
+            if (!email) {
+                return res.status(400).json({ kode: 400, message: 'Email wajib diisi' });
+            }
 
-                const user = results[0];
-
-                const tempPassword = Math.random().toString(36).slice(-8);
-
-                // update password sementara ke DB
-                const updateSql = `UPDATE m_user 
-                               SET pwd = SHA2(?,256), reset_token = NULL, reset_expires = NULL 
-                               WHERE m_user_id = ?`;
-                DB.query(updateSql, [tempPassword, user.m_user_id], (err) => {
-                    if (err) return res.status(500).json({ message: err.message });
-
-
-
-                    // kirim email pakai nodemailer
-                    const transporter = nodemailer.createTransport({
-                        // service: `gmail`,
-                        host: "smtp.gmail.com",
-                        port: 465,
-                        secure: true,
-                        auth: {
-                            user: process.env.EMAIL_USER, // email pengirim
-                            pass: process.env.EMAIL_PASS  // password
-                        }
-                    });
-
-                    const mailOptions = {
-                    from: process.env.EMAIL_USER,
-                    to: user.email,
-                    subject: "Password Sementara",
-                    html: `
-                        <p>Password sementara Anda adalah:</p>
-                        <h3>${tempPassword}</h3>
-                        <p>Silakan login dengan password ini, lalu segera ubah password di menu Ubah Password.</p>
-                    `
-                    };
-
-                    transporter.sendMail(mailOptions, (err, info) => {
-                    if (err) return res.status(500).json({ message: "Gagal kirim email", error: err });
-
-                    console.log("Email terkirim:", info.response);
-                    return res.json({ message: "Password sementara berhasil dikirim ke email." });
+            if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+                return res.status(500).json({
+                    kode: 500,
+                    message: 'Server configuration error'
                 });
-                    
-                });
+            }
+
+            const request = DB.promise();
+            const [users] = await request.query(
+                `SELECT m_user_id FROM m_user WHERE email = ? AND isactive = 1 LIMIT 1`,
+                [email]
+            );
+
+            if (users.length === 0) {
+                return res.status(404).json({ kode: 404, message: 'Email tidak ditemukan' });
+            }
+
+            const userId = users[0].m_user_id;
+            const newPassword = crypto.randomBytes(6).toString('hex') + 'A1!';
+            const hashedPassword = crypto.createHash('sha256').update(newPassword).digest('hex');
+
+            await request.query(
+                `UPDATE m_user SET pwd = ?, updatedate = NOW() WHERE m_user_id = ?`,
+                [hashedPassword, userId]
+            );
+
+            const transporter = nodemailer.createTransport({
+                host: 'smtp.gmail.com',
+                port: 587,
+                secure: false,
+                auth: {
+                    user: process.env.SMTP_USER,
+                    pass: process.env.SMTP_PASS
+                },
+                tls: { rejectUnauthorized: false }
             });
 
-        } catch (err) {
-            console.error(" Error catch:", err); // ADD LOG
-            return res.status(500).json({ message: err.message });
+            const mailOptions = {
+                from: `"Support" <${process.env.SMTP_USER}>`,
+                to: email,
+                subject: 'Reset Password',
+                html: `
+        <h3>Reset Password</h3>
+        <p>Password sementara: <strong>${newPassword}</strong></p>
+        <p>Silakan login dan ganti segera</p>
+      `
+            };
+
+            await transporter.sendMail(mailOptions);
+            return res.status(200).json({
+                kode: 200,
+                message: `Password sementara dikirim ke ${email}`
+            });
+
+        } catch (error) {
+            console.error('Error:', error);
+            if (error.stack) console.error(error.stack);
+            console.error('Full error JSON:', JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
+
+            return res.status(500).json({
+                kode: 500,
+                message: 'Gagal mengirim email',
+                error: error.message || error.toString(),
+            });
+        }
+    },
+
+    resetPassword: async function (req, res) {
+        try {
+            const request = DB.promise();
+            const { m_user_id, pwd } = req.body;
+
+            const pass = pwd && pwd.length < 30 ? pwd : 'Password123#';
+
+            await request.query(
+                `UPDATE m_user SET pwd = SHA2(?, 256), updatedate = NOW() WHERE m_user_id = ?`,
+                [pass, m_user_id]
+            );
+
+            return res.status(200).json({ kode: 200, message: 'Sukses' });
+
+        } catch (error) {
+            console.log(error);
+            return res.status(500).json({ kode: 500, message: 'Terjadi kesalahan server', error });
+        }
+    },
+
+    deleteUser: async function (req, res) {
+        try {
+            const request = DB.promise();
+            const { m_user_id } = req.body;
+
+            await request.query(
+                `UPDATE m_user SET isactive = 0, updatedate = NOW() WHERE m_user_id = ?`,
+                [m_user_id]
+            );
+
+            return res.status(200).json({ kode: 200, message: 'Sukses' });
+
+        } catch (error) {
+            console.log(error);
+            return res.status(500).json({ kode: 500, message: 'Gagal menghapus user', error });
         }
     }
-
-    // resetPassword: async function (req, res) {
-    //     const { token } = req.params;
-
-    //     try {
-    //         const sql = `select * from m_user where reset_token = ? and reset_expires > now()`;
-    //         DB.query(sql, [token], (err, results) => {
-    //             if (err) return res.status(500).json({ message: err.message });
-    //             if (results.length === 0) return res.status(400).json({ message: 'token invalid atau sudah expired' });
-
-    //             const user = results[0];
-
-    //             //generete password baru
-    //             const newPassword = Math.random().toString(36).slice(-8);
-
-    //             //update password
-    //             const updateSql = `update m_user set password= SHA2(?,256),reset_token = null, reset_expires = null where m_user_id = ?`;
-    //             DB.query(updateSql, [newPassword, user.m_user_id], (err) => {
-    //                 if (err) return res.status(500).json({ message: err.message });
-
-    //                 //kirim email  password baru
-    //                 const transporter = nodemailer.createTransport({
-    //                     host: "smtp.gmail.com",
-    //                     port: 465,
-    //                     secure: true,
-    //                     auth: {
-    //                         user: process.env.EMAIL_USER,
-    //                         pass: process.env.EMAIL_PASS
-    //                     }
-    //                 });
-
-    //                 const mailOptions = {
-    //                     from: process.env.EMAIL_USER,
-    //                     to: user.email,
-    //                     subject: "ini password baru anda",
-    //                     text: `password baru anda : ${newPassword}`
-    //                 }
-
-    //                 transporter.sendMail(mailOptions, () => { });
-    //                 return res.send("password berhasil di reset, silahkan cek email anda untuk password baru")
-    //             });
-    //         });
-    //     } catch (err) {
-    //         return res.status(500).json({ message: err.message });
-    //     }
-    // }
-
 };
