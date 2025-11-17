@@ -1,0 +1,199 @@
+{
+    "header": {
+        "nomorPengajuan": "000020-010002",
+        "tanggalPengajuan": "20251104-130900",
+        "pelabuhanTujuan": "IDTPP - Tanjung Priok",
+        "kantorPabean": "040300 - KPU TANJUNG PRIOK",
+        "jenisPIB": "1 - BIASA",
+        "jenisImport": "1 - UNTUK DIPAKAI",
+        "caraBayar": "2 - BERKALA"
+    },
+    "entitas": {
+        "ppjk": {
+            "jenisIdentitas": "6 - NPWP 16 DIGIT",
+            "nomorIdentitas": "0012345678901234",
+            "nama": "PT. JASA PENGURUSAN BEA CUKAI",
+            "alamat": "JL. JEND. SUDIRMAN KAV. 25, JAKARTA PUSAT"
+        },
+        "importir": {
+            "jenisIdentitas": "6 - NPWP 16 DIGIT",
+            "nomorIdentitas": "0010002301092000",
+            "nitku": "0010002301092000000000",
+            "nama": "PT. DENSO INDONESIA",
+            "alamat": "JL KALIMANTAN E 1-2, KAWASAN INDUSTRI MM2100, CIKARANG BARAT, BEKASI",
+            "apiNib": "02 - API-P",
+            "status": "LAINNYA - LAINNYA"
+        },
+        "pemilikBarang": {
+            "jenisIdentitas": "6 - NPWP 16 DIGIT",
+            "nomorIdentitas": "0010002301092000",
+            "nitku": "0010002301092000000000",
+            "nama": "PT. DENSO INDONESIA",
+            "alamat": "JL KALIMANTAN E 1-2, KAWASAN INDUSTRI MM2100, CIKARANG BARAT, BEKASI",
+            "afiliasi": "TAH - Tidak berhubungan"
+        },
+        "npwpPermusatan": {
+            "jenisIdentitas": "6 - NPWP 16 DIGIT",
+            "nomorIdentitas": "0010002301092000",
+            "nitku": "0010002301092000000000",
+            "nama": "PT. DENSO INDONESIA",
+            "alamat": "JL KALIMANTAN E 1-2, KAWASAN INDUSTRI MM2100, CIKARANG BARAT, BEKASI"
+        },
+        "pengirim": {
+            "nama": "TOYOTSU MACHINERY CORPORATION",
+            "alamat": "4-11-27,MEIEKI,NAKAMURA-KU,NAGOYA,AICHI,450-0002,JAPAN",
+            "negara": "JP-JAPAN"
+        },
+        "penjual": {
+            "nama": "TOYOTSU MACHINERY CORPORATION",
+            "alamat": "4-11-27, MEIEKI, NAKAMURA-KU, NAGOYA, AICHI, 450-0002, JAPAN",
+            "negara": "JP - JAPAN"
+        }
+    },
+    "pengangkut": {
+        "bcType": "BC11 - BC 1.1",
+        "nomorTutupPU": "PU-2025-00123",
+        "tanggalTutupPU": "05-11-2025",
+        "nomorPOS": "POS-456789",
+        "nomorSubPOS": "SUB-001",
+        "nomorSubSubPOS": "SUBSUB-001",
+        "caraPengangkutan": "1 - LAUT",
+        "namaSaranaAngkut": "GIALOVA",
+        "nomorVoyage": "036S",
+        "bendera": "LR - LIBERIA",
+        "perkiraanTanggalTiba": "08-11-2025",
+        "pelabuhanMuat": "JPNGO - Nagoya, Aichi",
+        "pelabuhanTransit": "",
+        "pelabuhanTujuan": "IDTPP - Tanjung Priok",
+        "tempatPenimbunan": ""
+    },
+    "dokumenLampiran": [
+        {
+            "seri": 1,
+            "jenis": "705 - B/L",
+            "nomor": "ONEYNGBAA5L07800",
+            "tanggal": "27-10-2025",
+            "fasilitas": "-"
+        },
+        {
+            "seri": 2,
+            "jenis": "911 - SURAT KEPUTUSAN",
+            "nomor": "KEP-131/BC/2017",
+            "tanggal": "14-02-2017",
+            "fasilitas": "Kep. Lainnya (selain 01-26 dan 29-36)"
+        },
+        {
+            "seri": 3,
+            "jenis": "380 - INVOICE",
+            "nomor": "JK009X60SE",
+            "tanggal": "07-10-2025",
+            "fasilitas": "-"
+        },
+        {
+            "seri": 4,
+            "jenis": "217 - PACKING LIST",
+            "nomor": "MS-27057",
+            "tanggal": "07-10-2025",
+            "fasilitas": "-"
+        }
+    ],
+    "kemasan": [
+        {
+            "no": 1,
+            "jenisKemasan": "PALLET",
+            "jumlah": "1:40"
+        },
+        {
+            "no": 2,
+            "jenisKemasan": "JUNLAN",
+            "jumlah": ""
+        },
+        {
+            "no": 3,
+            "jenisKemasan": "JCNIS",
+            "jumlah": ""
+        },
+        {
+            "no": 4,
+            "jenisKemasan": "NEREK",
+            "jumlah": ""
+        }
+    ],
+    "petiKemas": [
+        {
+            "no": 1,
+            "nomor": "REGUS074982",
+            "jenis": "GENERAL / DRY CARGO"
+        },
+        {
+            "no": 2,
+            "nomor": "CAAU7087227",
+            "jenis": "GENERAL / DRY CARGO"
+        }
+    ],
+    "transaksi": {
+        "valuta": "USD",
+        "mopbw": "1.670%",
+        "jorisTransaksi": "LAT - TRANSAKSI PERDAGANGAN ATAU CARA PEMBAYARAN LATINYA",
+        "informasiKomponenBiaya": false,
+        "hargaBarangTipe": "FOB",
+        "hargaBarang": "2352",
+        "nilaiPabean": "1053552421.8",
+        "biayaPenambahan": "0",
+        "biayaPengurangan": "0",
+        "freight": "718.3",
+        "asuransiTipe": "DN",
+        "nilaiAsuransi": "0",
+        "voluntaryDeclaration": "0",
+        "beratKotor": "48000",
+        "beratBersih": "48000"
+    },
+    "barang": [
+        {
+            "seri": 1,
+            "hsCode": "39021040",
+            "uraian": "PLASTIC COMPOUND POLYPROPYLENE PP EPH52 TALZED BLACK (JUNIER BAG)",
+            "nilaiBarang": "62352",
+            "jumlahSatuan": "48000",
+            "kodeSatuan": "KILOGRAM"
+        }
+    ],
+    "pungutan": [
+        {
+            "id": 1,
+            "pungutan": "BM",
+            "dibayarkan": "0",
+            "ditanggungPemerintah": "0",
+            "ditunda": "0",
+            "tidakDipungut": "0",
+            "direbaskan": "0",
+            "sudahDilunasi": "0"
+        },
+        {
+            "id": 2,
+            "pungutan": "PPH",
+            "dibayarkan": "Rp26,342,300.00",
+            "ditanggungPemerintah": "0",
+            "ditunda": "0",
+            "tidakDipungut": "0",
+            "direbaskan": "0",
+            "sudahDilunasi": "0"
+        },
+        {
+            "id": 3,
+            "pungutan": "PPN",
+            "dibayarkan": "Rp115,901,767.00",
+            "ditanggungPemerintah": "0",
+            "ditunda": "0",
+            "tidakDipungut": "0",
+            "direbaskan": "0",
+            "sudahDilunasi": "0"
+        }
+    ],
+    "pernyataan": {
+        "tempat": "",
+        "tanggal": "",
+        "nama": "",
+        "jabatan": ""
+    }
+}

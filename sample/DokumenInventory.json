@@ -1,0 +1,86 @@
+[
+    {
+        "id": "DOK001",
+        "nomorJob": "JOB/2024/IMP/001",
+        "jenisPengajuan": "Import",
+        "referensi": "REF-IMP-2024-001",
+        "dokumen": "PIB (Pemberitahuan Impor Barang)",
+        "importirExportir": "PT Maju Jaya Sentosa",
+        "pengajuanVia": "Online",
+        "pembuatanOrder": "2024-01-15T08:30:00Z",
+        "tdsStatus": "Approved",
+        "mandiriStatus": "Completed"
+    },
+    {
+        "id": "DOK002",
+        "nomorJob": "JOB/2024/EXP/002",
+        "jenisPengajuan": "Export",
+        "referensi": "REF-EXP-2024-002",
+        "dokumen": "PEB (Pemberitahuan Ekspor Barang)",
+        "importirExportir": "CV Surya Abadi",
+        "pengajuanVia": "Mobile",
+        "pembuatanOrder": "2024-01-16T09:15:00Z",
+        "tdsStatus": "Pending",
+        "mandiriStatus": "Pending"
+    },
+    {
+        "id": "DOK003",
+        "nomorJob": "JOB/2024/IMP/003",
+        "jenisPengajuan": "Import",
+        "referensi": "REF-IMP-2024-003",
+        "dokumen": "BC 2.3 (Impor Barang Kiriman)",
+        "importirExportir": "PT Global Logistics Indonesia",
+        "pengajuanVia": "Online",
+        "pembuatanOrder": "2024-01-17T10:45:00Z",
+        "tdsStatus": "Approved",
+        "mandiriStatus": "Completed"
+    },
+    {
+        "id": "DOK004",
+        "nomorJob": "JOB/2024/MUT/004",
+        "jenisPengajuan": "Mutasi",
+        "referensi": "REF-MUT-2024-004",
+        "dokumen": "BC 2.7 (Mutasi Antar Kawasan Berikat)",
+        "importirExportir": "PT Nusa Indah Warehouse",
+        "pengajuanVia": "Offline",
+        "pembuatanOrder": "2024-01-18T11:20:00Z",
+        "tdsStatus": "Rejected",
+        "mandiriStatus": "Failed"
+    },
+    {
+        "id": "DOK005",
+        "nomorJob": "JOB/2024/EXP/005",
+        "jenisPengajuan": "Export",
+        "referensi": "REF-EXP-2024-005",
+        "dokumen": "PEB (Pemberitahuan Ekspor Barang)",
+        "importirExportir": "PT Karya Gemilang",
+        "pengajuanVia": "Online",
+        "pembuatanOrder": "2024-01-19T13:00:00Z",
+        "tdsStatus": "Approved",
+        "mandiriStatus": "Completed"
+    },
+    {
+        "id": "DOK006",
+        "nomorJob": "JOB/2024/IMP/006",
+        "jenisPengajuan": "Import",
+        "referensi": "REF-IMP-2024-006",
+        "dokumen": "PIB (Pemberitahuan Impor Barang)",
+        "importirExportir": "CV Berkah Mandiri",
+        "pengajuanVia": "Mobile",
+        "pembuatanOrder": "2024-01-20T14:30:00Z",
+        "tdsStatus": "Pending",
+        "mandiriStatus": "Pending"
+    },
+    {
+        "id": "DOK007",
+        "nomorJob": "JOB/2024/IMP/007",
+        "jenisPengajuan": "Import",
+        "referensi": "REF-IMP-2024-007",
+        "dokumen": "BC 2.0 (Impor untuk Dipakai)",
+        "importirExportir": "PT Sejahtera Bersama",
+        "pengajuanVia": "Online",
+        "pembuatanOrder": "2024-01-21T08:00:00Z",
+        "tdsStatus": "Approved",
+        "mandiriStatus": "Completed"
+    }
+]

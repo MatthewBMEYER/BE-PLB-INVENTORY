@@ -1,7 +1,7 @@
 const express = require('express');
 const { DB } = require('../config/conf');
 const nodemailer = require('nodemailer');
-const crypto = require('crypto'); 
+const crypto = require('crypto');
 
 
 module.exports = {
@@ -9,7 +9,7 @@ module.exports = {
         try {
             const request = DB.promise();
             const { email, pwd } = req.body;
-            console.log('Login request : ', req.body); 
+            console.log('Login request : ', req.body);
 
             if (!email || !pwd) {
                 return res.status(400).json({ kode: 400, message: 'Email dan password wajib diisi' });
@@ -24,20 +24,26 @@ module.exports = {
             }
             if (user.isactive == 0 || user.role_id === null) {
                 return res.status(400).json({
-                  kode: 400,
-                  message: 'User Belum Aktif, Silahkan hubungi administrator',
+                    kode: 400,
+                    message: 'User Belum Aktif, Silahkan hubungi administrator',
                 });
-            }            
+            }
 
             const roleQuery = `
-                SELECT distinct b.nama_role, c.role_menu_id, c.header_menu, c.child_menu 
-                FROM m_user a
-                INNER JOIN m_role b ON a.role_id = b.role_id 
-                INNER JOIN role_menu c ON c.role_id = b.role_id 
-                inner join m_menu d on d.header_menu = c.header_menu 
-                WHERE a.m_user_id = ? AND c.isactive = 1
-                order by d.sort asc
-            `;
+            SELECT 
+                b.nama_role, 
+                c.role_menu_id, 
+                c.header_menu, 
+                c.child_menu,
+                MIN(d.sort) as sort
+            FROM m_user a
+            INNER JOIN m_role b ON a.role_id = b.role_id 
+            INNER JOIN role_menu c ON c.role_id = b.role_id 
+            INNER JOIN m_menu d ON d.header_menu = c.header_menu 
+            WHERE a.m_user_id = ? AND c.isactive = 1
+            GROUP BY b.nama_role, c.role_menu_id, c.header_menu, c.child_menu
+            ORDER BY sort ASC
+        `;
 
             const [roleMenus] = await request.query(roleQuery, [user.m_user_id]);
 
@@ -45,27 +51,59 @@ module.exports = {
                 return res.status(401).json({ kode: 401, message: 'Role belum diatur!' });
             }
 
+            const processedMenus = [];
+            const processedHeaders = new Set();
+
             for (let i = 0; i < roleMenus.length; i++) {
-                const { child_menu, header_menu } = roleMenus[i];
+                const { header_menu, child_menu, role_menu_id, nama_role, sort } = roleMenus[i];
+
+                if (processedHeaders.has(header_menu)) {
+                    continue;
+                }
+                processedHeaders.add(header_menu);
+
+                let children = [];
                 if (child_menu) {
-                    const childQuery = `
+                    const childArray = child_menu.split(',').map(item => item.trim()).filter(item => item !== '');
+
+                    if (childArray.length > 0) {
+                        const placeholders = childArray.map(() => '?').join(',');
+                        const childQuery = `
                         SELECT * FROM m_menu 
-                        WHERE child IN (${child_menu}) AND header_menu = ? AND isactive = 1 
+                        WHERE child IN (${placeholders}) AND header_menu = ? AND isactive = 1 
                         ORDER BY sort ASC
                     `;
-                    const [children] = await request.query(childQuery, [header_menu]);
-                    roleMenus[i] = { ...roleMenus[i], child: children };
+                        const [childResults] = await request.query(childQuery, [...childArray, header_menu]);
+                        children = childResults;
+                    }
                 }
+
+                processedMenus.push({
+                    nama_role,
+                    role_menu_id,
+                    header_menu,
+                    child_menu,
+                    sort,
+                    child: children
+                });
             }
 
             return res.status(200).json({
                 kode: 200,
                 message: 'OK',
-                data: { user, roleMenus },
+                data: { user, roleMenus: processedMenus },
             });
 
         } catch (error) {
-            return res.status(500).json({ kode: 500, message: 'Terjadi kesalahan server', error });
+            console.error('Login error:', error);
+            return res.status(500).json({
+                kode: 500,
+                message: 'Terjadi kesalahan server',
+                error: {
+                    message: error.message,
+                    code: error.code
+                }
+            });
         }
     },
 
@@ -73,7 +111,18 @@ module.exports = {
         try {
             const request = DB.promise();
             const [data] = await request.query(`SELECT * FROM m_user`);
-            res.status(200).json({ kode: 200,message: "OK", data });
+            res.status(200).json({ kode: 200, message: "OK", data });
+        } catch (error) {
+            console.log(error);
+            res.status(500).json(error);
+        }
+    },
+
+    list: async function (req, res) {
+        try {
+            const request = DB.promise();
+            const [data] = await request.query(`SELECT * FROM m_user`);
+            res.status(200).json({ kode: 200, message: "OK", data });
         } catch (error) {
             console.log(error);
             res.status(500).json(error);
@@ -83,7 +132,7 @@ module.exports = {
     registerUser: async function (req, res) {
         try {
             const request = DB.promise();
-            const { nama_user, email, password , role_id } = req.body;
+            const { nama_user, email, password, role_id } = req.body;
 
             console.log('register request : ', req.body);
 
