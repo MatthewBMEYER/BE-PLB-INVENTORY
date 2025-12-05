@@ -164,6 +164,165 @@ module.exports = {
         }
     },
 
+    googleAuth: async function (req, res) {
+
+        // Tambahin Query ini ke DB buat google function
+        // ALTER TABLE m_user 
+        // ADD COLUMN google_id VARCHAR(255) NULL DEFAULT NULL 
+        // COMMENT 'Google OAuth ID' 
+        // AFTER pwd;
+
+        try {
+            const request = DB.promise();
+            const { token, email, name, google_id } = req.body;
+
+            console.log('Google auth request:', req.body);
+
+            if (!email) {
+                return res.status(400).json({
+                    kode: 400,
+                    message: 'Email diperlukan dari Google OAuth'
+                });
+            }
+
+            // Check if user exists
+            const [users] = await request.query(
+                `SELECT * FROM m_user WHERE email = ? OR google_id = ? LIMIT 1`,
+                [email, google_id]
+            );
+
+            let user;
+
+            if (users.length > 0) {
+                // User exists - login flow
+                user = users[0];
+
+                if (google_id && !user.google_id) {
+                    await request.query(
+                        `UPDATE m_user SET google_id = ?, updatedate = NOW() WHERE m_user_id = ?`,
+                        [google_id, user.m_user_id]
+                    );
+                    user.google_id = google_id;
+                }
+            } else {
+                // User doesn't exist - register flow
+                const role_id = 2; // Default role for new users
+                const randomPassword = Math.random().toString(36).slice(-12) +
+                    Math.random().toString(36).toUpperCase().slice(-4);
+
+                await request.query(
+                    `INSERT INTO m_user 
+                (m_user_id, nama_user, email, pwd, google_id, isactive, role_id, createdate)
+                VALUES (UUID(), ?, ?, SHA2(?, 256), ?, 1, ?, NOW())`,
+                    [name, email, randomPassword, google_id, role_id]
+                );
+
+                // Get the newly created user
+                const [newUsers] = await request.query(
+                    `SELECT * FROM m_user WHERE email = ? LIMIT 1`,
+                    [email]
+                );
+
+                user = newUsers[0];
+            }
+
+            if (user.isactive == 0 || user.role_id === null) {
+                return res.status(400).json({
+                    kode: 400,
+                    message: 'User Belum Aktif, Silahkan hubungi administrator',
+                });
+            }
+            const roleQuery = `
+            SELECT 
+                b.nama_role, 
+                c.role_menu_id, 
+                c.header_menu, 
+                c.child_menu,
+                MIN(d.sort) as sort
+            FROM m_user a
+            INNER JOIN m_role b ON a.role_id = b.role_id 
+            INNER JOIN role_menu c ON c.role_id = b.role_id 
+            INNER JOIN m_menu d ON d.header_menu = c.header_menu 
+            WHERE a.m_user_id = ? AND c.isactive = 1
+            GROUP BY b.nama_role, c.role_menu_id, c.header_menu, c.child_menu
+            ORDER BY sort ASC
+        `;
+
+            const [roleMenus] = await request.query(roleQuery, [user.m_user_id]);
+
+            if (roleMenus.length === 0) {
+                return res.status(401).json({
+                    kode: 401,
+                    message: 'Role belum diatur!',
+                    data: {
+                        user: {
+                            ...user,
+                            login_method: 'google'
+                        },
+                        roleMenus: []
+                    }
+                });
+            }
+
+            const processedMenus = [];
+            const processedHeaders = new Set();
+
+            for (let i = 0; i < roleMenus.length; i++) {
+                const { header_menu, child_menu, role_menu_id, nama_role, sort } = roleMenus[i];
+
+                if (processedHeaders.has(header_menu)) {
+                    continue;
+                }
+                processedHeaders.add(header_menu);
+
+                let children = [];
+                if (child_menu) {
+                    const childArray = child_menu.split(',').map(item => item.trim()).filter(item => item !== '');
+
+                    if (childArray.length > 0) {
+                        const placeholders = childArray.map(() => '?').join(',');
+                        const childQuery = `
+                        SELECT * FROM m_menu 
+                        WHERE child IN (${placeholders}) AND header_menu = ? AND isactive = 1 
+                        ORDER BY sort ASC
+                    `;
+                        const [childResults] = await request.query(childQuery, [...childArray, header_menu]);
+                        children = childResults;
+                    }
+                }
+
+                processedMenus.push({
+                    nama_role,
+                    role_menu_id,
+                    header_menu,
+                    child_menu,
+                    sort,
+                    child: children
+                });
+            }
+
+            return res.status(200).json({
+                kode: 200,
+                message: users.length > 0 ? 'Google login berhasil' : 'Registrasi dengan Google berhasil',
+                data: {
+                    user: {
+                        ...user,
+                        login_method: 'google'
+                    },
+                    roleMenus: processedMenus
+                },
+            });
+
+        } catch (error) {
+            console.error('Google auth error:', error);
+            return res.status(500).json({
+                kode: 500,
+                message: 'Terjadi kesalahan server saat autentikasi Google',
+                error: error.message
+            });
+        }
+    },
+
     forgotPassword: async function (req, res) {
         console.log("SMTP_USER:", process.env.SMTP_USER);
         console.log("SMTP_PASS:", process.env.SMTP_PASS ? 'SET' : 'NOT SET');
