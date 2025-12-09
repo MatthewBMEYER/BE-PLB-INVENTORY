@@ -164,74 +164,54 @@ module.exports = {
         }
     },
 
-    googleAuth: async function (req, res) {
-
-        // Tambahin Query ini ke DB buat google function
-        // ALTER TABLE m_user 
-        // ADD COLUMN google_id VARCHAR(255) NULL DEFAULT NULL 
-        // COMMENT 'Google OAuth ID' 
-        // AFTER pwd;
-
+    googleLogin: async function (req, res) {
         try {
             const request = DB.promise();
-            const { token, email, name, google_id } = req.body;
+            const { token, email, google_id } = req.body;
 
-            console.log('Google auth request:', req.body);
+            console.log('Google LOGIN request:', { email, google_id });
 
-            if (!email) {
+            if (!email || !google_id) {
                 return res.status(400).json({
                     kode: 400,
-                    message: 'Email diperlukan dari Google OAuth'
+                    message: 'Email dan Google ID diperlukan'
                 });
             }
 
-            // Check if user exists
+            // Check if user exists with this Google ID or email
             const [users] = await request.query(
-                `SELECT * FROM m_user WHERE email = ? OR google_id = ? LIMIT 1`,
+                `SELECT * FROM m_user WHERE (email = ? OR google_id = ?) AND google_id IS NOT NULL LIMIT 1`,
                 [email, google_id]
             );
 
-            let user;
-
-            if (users.length > 0) {
-                // User exists - login flow
-                user = users[0];
-
-                if (google_id && !user.google_id) {
-                    await request.query(
-                        `UPDATE m_user SET google_id = ?, updatedate = NOW() WHERE m_user_id = ?`,
-                        [google_id, user.m_user_id]
-                    );
-                    user.google_id = google_id;
-                }
-            } else {
-                // User doesn't exist - register flow
-                const role_id = 2; // Default role for new users
-                const randomPassword = Math.random().toString(36).slice(-12) +
-                    Math.random().toString(36).toUpperCase().slice(-4);
-
-                await request.query(
-                    `INSERT INTO m_user 
-                (m_user_id, nama_user, email, pwd, google_id, isactive, role_id, createdate)
-                VALUES (UUID(), ?, ?, SHA2(?, 256), ?, 1, ?, NOW())`,
-                    [name, email, randomPassword, google_id, role_id]
-                );
-
-                // Get the newly created user
-                const [newUsers] = await request.query(
-                    `SELECT * FROM m_user WHERE email = ? LIMIT 1`,
-                    [email]
-                );
-
-                user = newUsers[0];
+            if (users.length === 0) {
+                // User doesn't exist or not a Google user
+                return res.status(404).json({
+                    kode: 404,
+                    message: 'Akun Google tidak ditemukan. Silakan daftar terlebih dahulu.',
+                    email: email
+                });
             }
 
+            const user = users[0];
+
+            // Update Google ID if email matches but Google ID not set
+            if (user.google_id !== google_id && user.email === email) {
+                await request.query(
+                    `UPDATE m_user SET google_id = ?, updatedate = NOW() WHERE m_user_id = ?`,
+                    [google_id, user.m_user_id]
+                );
+                user.google_id = google_id;
+            }
+
+            // Check if user is active
             if (user.isactive == 0 || user.role_id === null) {
                 return res.status(400).json({
                     kode: 400,
                     message: 'User Belum Aktif, Silahkan hubungi administrator',
                 });
             }
+
             const roleQuery = `
             SELECT 
                 b.nama_role, 
@@ -303,7 +283,7 @@ module.exports = {
 
             return res.status(200).json({
                 kode: 200,
-                message: users.length > 0 ? 'Google login berhasil' : 'Registrasi dengan Google berhasil',
+                message: 'Google login berhasil',
                 data: {
                     user: {
                         ...user,
@@ -314,10 +294,121 @@ module.exports = {
             });
 
         } catch (error) {
-            console.error('Google auth error:', error);
+            console.error('Google login error:', error);
             return res.status(500).json({
                 kode: 500,
-                message: 'Terjadi kesalahan server saat autentikasi Google',
+                message: 'Terjadi kesalahan server saat Google login',
+                error: error.message
+            });
+        }
+    },
+
+    googleRegister: async function (req, res) {
+        try {
+            const request = DB.promise();
+            const { token, email, name, google_id, password, confirmPassword } = req.body;
+
+            console.log('Google REGISTER request:', { email, name, hasPassword: !!password });
+
+            if (!email || !name || !google_id) {
+                return res.status(400).json({
+                    kode: 400,
+                    message: 'Email, nama, dan Google ID diperlukan'
+                });
+            }
+
+            // Check if email already exists
+            const [existingEmailUsers] = await request.query(
+                `SELECT * FROM m_user WHERE email = ? LIMIT 1`,
+                [email]
+            );
+
+            if (existingEmailUsers.length > 0) {
+                // Email already exists
+                const existingUser = existingEmailUsers[0];
+                if (existingUser.google_id) {
+                    // User already has Google account - they should login instead
+                    return res.status(409).json({
+                        kode: 409,
+                        message: 'Email sudah terdaftar dengan akun Google. Silakan login.',
+                        email: email
+                    });
+                } else {
+                    // Email exists as regular user (non-Google)
+                    return res.status(409).json({
+                        kode: 409,
+                        message: 'Email sudah terdaftar dengan metode login email/password. Silakan login dengan email dan password.',
+                        email: email
+                    });
+                }
+            }
+
+            // Check if Google ID already exists
+            const [existingGoogleUsers] = await request.query(
+                `SELECT * FROM m_user WHERE google_id = ? LIMIT 1`,
+                [google_id]
+            );
+
+            if (existingGoogleUsers.length > 0) {
+                return res.status(409).json({
+                    kode: 409,
+                    message: 'Akun Google ini sudah terdaftar.',
+                    email: existingGoogleUsers[0].email
+                });
+            }
+
+            // Validate password for registration
+            if (!password || !confirmPassword) {
+                return res.status(400).json({
+                    kode: 400,
+                    message: 'Password diperlukan untuk registrasi dengan Google'
+                });
+            }
+
+            if (password !== confirmPassword) {
+                return res.status(400).json({
+                    kode: 400,
+                    message: 'Password dan konfirmasi password tidak cocok'
+                });
+            }
+
+            // Register new user with provided password
+            const role_id = null;
+            const isactive = 1;
+
+            await request.query(
+                `INSERT INTO m_user 
+            (m_user_id, nama_user, email, pwd, google_id, isactive, role_id, createdate)
+            VALUES (UUID(), ?, ?, SHA2(?, 256), ?, ?, ?, NOW())`,
+                [name, email, password, google_id, isactive, role_id]
+            );
+
+            // Get the newly created user
+            const [newUsers] = await request.query(
+                `SELECT * FROM m_user WHERE email = ? LIMIT 1`,
+                [email]
+            );
+
+            const user = newUsers[0];
+
+            // Return success - user created but inactive
+            return res.status(201).json({
+                kode: 201,
+                message: 'Registrasi dengan Google berhasil. Akun menunggu aktivasi admin.',
+                data: {
+                    user: {
+                        ...user,
+                        login_method: 'google'
+                    },
+                    roleMenus: [] // No role menus yet (inactive)
+                }
+            });
+
+        } catch (error) {
+            console.error('Google register error:', error);
+            return res.status(500).json({
+                kode: 500,
+                message: 'Terjadi kesalahan server saat registrasi Google',
                 error: error.message
             });
         }

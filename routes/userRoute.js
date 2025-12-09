@@ -12,6 +12,8 @@ router.delete(`/deleteUser`, userController.deleteUser);
 router.post(`/resetPassword`, userController.resetPassword);
 router.post(`/forgotPassword`, userController.forgotPassword);
 
-router.post('/google/auth', userController.googleAuth);
+router.post('/google/auth/login', userController.googleLogin);
+router.post('/google/auth/register', userController.googleRegister);
+
 
 module.exports = router;
